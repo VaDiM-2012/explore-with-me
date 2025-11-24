@@ -22,7 +22,7 @@ services:
       dockerfile: Dockerfile
     container_name: stats-server
     ports:
-      - "9090:9090"
+      - "0.0.0.0:9090:9090"  # Важное изменение!
     depends_on:
       stats-db:
         condition: service_healthy
@@ -31,12 +31,13 @@ services:
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: root
       SERVER_PORT: 9090
+      SERVER_ADDRESS: 0.0.0.0  # Добавляем эту переменную
     healthcheck:
-      test: [ "CMD-SHELL", "curl -f http://localhost:9090/actuator/health || exit 1" ]
+      test: [ "CMD-SHELL", "curl -f http://localhost:9090/actuator/health || curl -f http://localhost:9090 || nc -z localhost 9090 || exit 1" ]
       interval: 10s
       timeout: 5s
-      retries: 10
-      start_period: 40s
+      retries: 15  # Увеличиваем количество попыток
+      start_period: 60s  # Увеличиваем время на старт
 
 #  ewm-service:
 #    ports:
