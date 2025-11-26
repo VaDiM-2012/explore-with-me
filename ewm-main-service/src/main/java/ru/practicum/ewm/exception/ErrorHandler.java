@@ -69,7 +69,6 @@ public class ErrorHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiError handleBadRequestException(final Exception e) {
         log.warn("400 Bad Request: {}", e.getMessage());
-        
         String message = e.getMessage();
         List<String> errors = Collections.singletonList(getStackTraceAsString(e));
 
