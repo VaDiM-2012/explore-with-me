@@ -7,8 +7,9 @@ import org.springframework.web.bind.annotation.*;
 import ru.practicum.ewm.event.dto.EventFullDto;
 import ru.practicum.ewm.event.dto.EventShortDto;
 import ru.practicum.ewm.event.service.PublicEventService;
+import ru.practicum.stats.client.StatsClient; // Импорт клиента статистики
+import java.time.LocalDateTime; // Импорт для получения текущего времени
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -16,7 +17,11 @@ import java.util.List;
 @RequiredArgsConstructor
 public class PublicEventController {
 
+    // Константа для имени сервиса при отправке статистики
+    private static final String APP_NAME = "ewm-main-service";
+
     private final PublicEventService publicEventService;
+    private final StatsClient statsClient; // Инжекция клиента статистики
 
     @GetMapping
     public List<EventShortDto> getEvents(
@@ -32,12 +37,30 @@ public class PublicEventController {
             HttpServletRequest request) {
 
         String ip = request.getRemoteAddr();
+
+        // Отправляем информацию о "хите" в сервис статистики
+        statsClient.hit(
+                APP_NAME,
+                request.getRequestURI(),    // Получаем URI запроса
+                ip,                         // IP-адрес клиента
+                LocalDateTime.now()         // Текущее время
+        );
+
         return publicEventService.getEvents(text, categories, paid, rangeStart, rangeEnd, onlyAvailable, sort, from, size, ip);
     }
 
     @GetMapping("/{id}")
     public EventFullDto getEventById(@PathVariable Long id, HttpServletRequest request) {
         String ip = request.getRemoteAddr();
+
+        // Отправляем информацию о "хите" в сервис статистики
+        statsClient.hit(
+                APP_NAME,
+                request.getRequestURI(),    // Получаем URI запроса (включая id)
+                ip,                         // IP-адрес клиента
+                LocalDateTime.now()         // Текущее время
+        );
+
         return publicEventService.getEventById(id, ip);
     }
 }

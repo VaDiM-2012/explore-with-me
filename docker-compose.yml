@@ -16,7 +16,7 @@ services:
 
   stats-server:
     build:
-      context: .
+      context: ./ewm-stats-service/stats-server  # ← Изменено: указываем на подпапку с src и pom.xml
       dockerfile: Dockerfile
     container_name: stats-server
     ports:
@@ -47,19 +47,22 @@ services:
 
   ewm-main-service:
     build:
-      context: .
-      dockerfile: ewm-main-service/Dockerfile # Рекомендуется создать Dockerfile для основного сервиса
+      context: ./ewm-main-service
+      dockerfile: Dockerfile
     container_name: ewm-main-service
     ports:
       - "8080:8080"
-    depends_on:
-      ewm-db:
-        condition: service_healthy
-      stats-server:
-       condition: service_healthy
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://ewm-db:5432/ewm-db
       SPRING_DATASOURCE_USERNAME: ewm
       SPRING_DATASOURCE_PASSWORD: ewm
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
       STATS_SERVER_URL: http://stats-server:9090
       SERVER_PORT: 8080
+    depends_on:
+      - ewm-db
+      - stats-server
+
+networks:
+  default:
+    driver: bridge
