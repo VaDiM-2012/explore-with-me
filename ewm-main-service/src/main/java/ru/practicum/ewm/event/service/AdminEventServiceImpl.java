@@ -19,6 +19,7 @@ import ru.practicum.ewm.exception.NotFoundException;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -38,9 +39,36 @@ public class AdminEventServiceImpl implements AdminEventService {
                                            Integer from,
                                            Integer size) {
 
-        var pageable = PageRequest.of(from / size, size, Sort.by("id").ascending());
+        // Исправление: конвертируем строки в enum State (игнорируем неизвестные)
+        List<State> stateEnums = null;
+        if (states != null && !states.isEmpty()) {
+            stateEnums = states.stream()
+                    .map(s -> {
+                        try {
+                            return State.valueOf(s.toUpperCase());
+                        } catch (IllegalArgumentException e) {
+                            return null; // или можно бросить ValidationException
+                        }
+                    })
+                    .filter(Objects::nonNull)
+                    .toList();
 
-        return eventRepository.findAllByAdminFilters(users, states, categories, rangeStart, rangeEnd, pageable)
+            if (stateEnums.isEmpty()) {
+                stateEnums = null; // если все значения некорректны — ищем без фильтра по state
+            }
+        }
+
+        // Правильная пагинация (аналогично тому, что было в CategoryServiceImpl)
+        int page = from == 0 ? 0 : from / size;
+        var pageable = PageRequest.of(page, size, Sort.by("id").ascending());
+
+        return eventRepository.findAllByAdminFilters(
+                        users,
+                        stateEnums,          // передаём уже enum, а не строки
+                        categories,
+                        rangeStart,
+                        rangeEnd,
+                        pageable)
                 .stream()
                 .map(eventMapper::toFullDto)
                 .toList();

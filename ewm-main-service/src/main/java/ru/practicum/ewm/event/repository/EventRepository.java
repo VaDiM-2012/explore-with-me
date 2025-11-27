@@ -27,7 +27,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
             "AND (cast(:rangeStart as timestamp) IS NULL OR e.eventDate >= :rangeStart) " +
             "AND (cast(:rangeEnd as timestamp) IS NULL OR e.eventDate <= :rangeEnd) ")
     Page<Event> findAllByAdminFilters(@Param("users") List<Long> users,
-                                      @Param("states") List<String> states,
+                                      @Param("states") List<State> states,
                                       @Param("categories") List<Long> categories,
                                       @Param("rangeStart") LocalDateTime rangeStart,
                                       @Param("rangeEnd") LocalDateTime rangeEnd,
