@@ -1,6 +1,8 @@
 package ru.practicum.ewm.request.service;
 
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.ewm.event.model.Event;
@@ -27,6 +29,8 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class RequestServiceImpl implements RequestService {
 
+    private static final Logger log = LoggerFactory.getLogger(RequestServiceImpl.class);
+
     private final RequestRepository requestRepository;
     private final UserRepository userRepository;
     private final EventRepository eventRepository;
@@ -35,31 +39,45 @@ public class RequestServiceImpl implements RequestService {
     @Override
     @Transactional
     public ParticipationRequestDto createRequest(Long userId, Long eventId) {
+        log.info("Creating participation request for user={} on event={}", userId, eventId);
+
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("User with id=" + userId + " not found"));
+                .orElseThrow(() -> {
+                    log.warn("User with id={} not found", userId);
+                    return new NotFoundException("User with id=" + userId + " not found");
+                });
 
         Event event = eventRepository.findById(eventId)
-                .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " not found"));
+                .orElseThrow(() -> {
+                    log.warn("Event with id={} not found", eventId);
+                    return new NotFoundException("Event with id=" + eventId + " not found");
+                });
 
         if (event.getInitiator().getId().equals(userId)) {
+            log.warn("User={} is initiator of event={}, cannot request participation", userId, eventId);
             throw new ConflictException("Initiator cannot request participation in own event");
         }
 
         if (!event.getState().equals(State.PUBLISHED)) {
+            log.warn("Event={} is not published, cannot participate", eventId);
             throw new ConflictException("Cannot participate in unpublished event");
         }
 
         if (requestRepository.existsByRequesterIdAndEventId(userId, eventId)) {
+            log.warn("Duplicate participation request for user={} on event={}", userId, eventId);
             throw new ConflictException("Duplicate participation request");
         }
 
         long confirmed = requestRepository.countByEventIdAndStatus(eventId, RequestStatus.CONFIRMED);
         if (event.getParticipantLimit() > 0 && confirmed >= event.getParticipantLimit()) {
+            log.warn("Participant limit reached for event={}", eventId);
             throw new ConflictException("Participant limit reached");
         }
 
         RequestStatus status = (event.getParticipantLimit() == 0 || !event.getRequestModeration())
                 ? RequestStatus.CONFIRMED : RequestStatus.PENDING;
+
+        log.info("Request status set to {} for user={} on event={}", status, userId, eventId);
 
         ParticipationRequest request = ParticipationRequest.builder()
                 .requester(user)
@@ -68,57 +86,88 @@ public class RequestServiceImpl implements RequestService {
                 .build();
 
         ParticipationRequest saved = requestRepository.save(request);
+        log.info("Participation request created with id={}", saved.getId());
         return requestMapper.toDto(saved);
     }
 
     @Override
     public List<ParticipationRequestDto> getUserRequests(Long userId) {
+        log.info("Fetching participation requests for user={}", userId);
+
         if (!userRepository.existsById(userId)) {
+            log.warn("User with id={} not found", userId);
             throw new NotFoundException("User with id=" + userId + " not found");
         }
-        return requestRepository.findAllByRequesterId(userId).stream()
+
+        List<ParticipationRequestDto> requests = requestRepository.findAllByRequesterId(userId).stream()
                 .map(requestMapper::toDto)
                 .collect(Collectors.toList());
+
+        log.info("Found {} participation requests for user={}", requests.size(), userId);
+        return requests;
     }
 
     @Override
     @Transactional
     public ParticipationRequestDto cancelRequest(Long userId, Long requestId) {
+        log.info("Canceling request id={} for user={}", requestId, userId);
+
         ParticipationRequest request = requestRepository.findByIdAndRequesterId(requestId, userId)
-                .orElseThrow(() -> new NotFoundException("Request with id=" + requestId + " for user=" + userId + " not found"));
+                .orElseThrow(() -> {
+                    log.warn("Request with id={} for user={} not found", requestId, userId);
+                    return new NotFoundException("Request with id=" + requestId + " for user=" + userId + " not found");
+                });
 
         if (!request.getStatus().equals(RequestStatus.PENDING)) {
+            log.warn("Request id={} is not pending, cannot cancel", requestId);
             throw new ConflictException("Only pending requests can be canceled");
         }
 
         request.setStatus(RequestStatus.CANCELED);
         ParticipationRequest updated = requestRepository.save(request);
+        log.info("Request id={} canceled successfully", requestId);
         return requestMapper.toDto(updated);
     }
 
     @Override
     public List<ParticipationRequestDto> getEventRequests(Long userId, Long eventId) {
-        Event event = eventRepository.findByInitiatorIdAndId(userId, eventId)
-                .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " for user=" + userId + " not found"));
+        log.info("Fetching requests for event={} by initiator={}", eventId, userId);
 
-        return requestRepository.findAllByEventId(eventId).stream()
+        Event event = eventRepository.findByInitiatorIdAndId(userId, eventId)
+                .orElseThrow(() -> {
+                    log.warn("Event with id={} for user={} not found", eventId, userId);
+                    return new NotFoundException("Event with id=" + eventId + " for user=" + userId + " not found");
+                });
+
+        List<ParticipationRequestDto> requests = requestRepository.findAllByEventId(eventId).stream()
                 .map(requestMapper::toDto)
                 .collect(Collectors.toList());
+
+        log.info("Found {} requests for event={}", requests.size(), eventId);
+        return requests;
     }
 
     @Override
     @Transactional
     public EventRequestStatusUpdateResult updateRequestsStatus(Long userId, Long eventId, EventRequestStatusUpdateRequest updateRequest) {
+        log.info("Updating request statuses for event={} by initiator={}. RequestIds: {}, new status: {}",
+                eventId, userId, updateRequest.getRequestIds(), updateRequest.getStatus());
+
         Event event = eventRepository.findByInitiatorIdAndId(userId, eventId)
-                .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " for user=" + userId + " not found"));
+                .orElseThrow(() -> {
+                    log.warn("Event with id={} for user={} not found", eventId, userId);
+                    return new NotFoundException("Event with id=" + eventId + " for user=" + userId + " not found");
+                });
 
         if (!event.getRequestModeration() || event.getParticipantLimit() == 0) {
+            log.warn("Event={} does not require request moderation", eventId);
             throw new ConflictException("No moderation required for this event");
         }
 
         List<ParticipationRequest> requests = requestRepository.findAllByEventIdAndIdIn(eventId, updateRequest.getRequestIds());
 
         if (requests.stream().anyMatch(r -> !r.getStatus().equals(RequestStatus.PENDING))) {
+            log.warn("Attempt to update non-pending requests: {}", updateRequest.getRequestIds());
             throw new ConflictException("Only pending requests can be moderated");
         }
 
@@ -131,6 +180,7 @@ public class RequestServiceImpl implements RequestService {
             long available = event.getParticipantLimit() - currentConfirmed;
 
             if (available <= 0) {
+                log.warn("Participant limit reached for event={}", eventId);
                 throw new ConflictException("Participant limit reached");
             }
 
@@ -141,6 +191,7 @@ public class RequestServiceImpl implements RequestService {
                 req.setStatus(RequestStatus.CONFIRMED);
                 requestRepository.save(req);
                 confirmed.add(requestMapper.toDto(req));
+                log.info("Request id={} confirmed", req.getId());
             }
 
             // Reject remaining if any
@@ -149,6 +200,7 @@ public class RequestServiceImpl implements RequestService {
                 req.setStatus(RequestStatus.REJECTED);
                 requestRepository.save(req);
                 rejected.add(requestMapper.toDto(req));
+                log.info("Request id={} rejected (excess after limit)", req.getId());
             }
 
             // Auto-reject all other pending if limit reached
@@ -160,6 +212,7 @@ public class RequestServiceImpl implements RequestService {
                     req.setStatus(RequestStatus.REJECTED);
                     requestRepository.save(req);
                     rejected.add(requestMapper.toDto(req));
+                    log.info("Request id={} auto-rejected due to limit", req.getId());
                 }
             }
 
@@ -168,9 +221,11 @@ public class RequestServiceImpl implements RequestService {
                 req.setStatus(RequestStatus.REJECTED);
                 requestRepository.save(req);
                 rejected.add(requestMapper.toDto(req));
+                log.info("Request id={} rejected", req.getId());
             }
         }
 
+        log.info("Request status update completed: {} confirmed, {} rejected", confirmed.size(), rejected.size());
         return new EventRequestStatusUpdateResult(confirmed, rejected);
     }
 }

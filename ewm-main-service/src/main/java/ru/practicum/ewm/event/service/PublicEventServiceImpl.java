@@ -54,11 +54,14 @@ public class PublicEventServiceImpl implements PublicEventService {
                                          Integer size,
                                          String ip) {
 
-        // Отправляем информацию о "хите" в сервис статистики (дубликат из контроллера, но оставляем)
+        log.info("Начало публичного поиска событий с параметрами: text='{}', categories={}, paid={}, rangeStart={}, rangeEnd={}, onlyAvailable={}, sort={}, from={}, size={}, ip={}",
+                text, categories, paid, rangeStart, rangeEnd, onlyAvailable, sort, from, size, ip);
+
         try {
             statsClient.hit("ewm-main-service", "/events", ip, LocalDateTime.now());
+            log.debug("Отправлена статистика о просмотре списка событий с IP: {}", ip);
         } catch (Exception e) {
-            log.warn("Failed to send hit to stats service: {}", e.getMessage());
+            log.warn("Не удалось отправить данные в сервис статистики: {}", e.getMessage());
         }
 
         LocalDateTime start = rangeStart != null ? rangeStart : LocalDateTime.now();
@@ -71,19 +74,23 @@ public class PublicEventServiceImpl implements PublicEventService {
         PageRequest page = PageRequest.of(from / size, size, sorting);
 
         List<Event> events = eventRepository.findPublicEvents(text, categories, paid, start, end, page);
+        log.debug("Найдено {} событий по фильтрам", events.size());
 
-        // Filter only available events if requested
+        // Фильтрация по доступности
         if (Boolean.TRUE.equals(onlyAvailable)) {
+            log.debug("Фильтрация событий по доступности участия");
             Map<Long, Long> confirmedMap = getConfirmedRequestsMap(
                     events.stream().map(Event::getId).collect(Collectors.toList())
             );
+            int before = events.size();
             events = events.stream()
                     .filter(e -> e.getParticipantLimit() == 0 ||
                             confirmedMap.getOrDefault(e.getId(), 0L) < e.getParticipantLimit())
                     .collect(Collectors.toList());
+            log.debug("После фильтрации по доступности осталось {} событий из {}", events.size(), before);
         }
 
-        // Fetch views and confirmed requests in bulk
+        // Получение статистики просмотров и подтверждённых заявок
         Map<Long, Long> viewsMap = getViewsForEvents(events);
         Map<Long, Long> confirmedMap = getConfirmedRequestsMap(
                 events.stream().map(Event::getId).collect(Collectors.toList())
@@ -98,28 +105,40 @@ public class PublicEventServiceImpl implements PublicEventService {
                 })
                 .collect(Collectors.toList());
 
-        // Apply VIEWS sorting client-side if requested
+        // Сортировка по просмотрам на стороне клиента
         if ("VIEWS".equalsIgnoreCase(sort)) {
+            log.debug("Сортировка событий по количеству просмотров (по убыванию)");
             dtos.sort(Comparator.comparing(EventShortDto::getViews).reversed());
             int toIndex = Math.min(from + size, dtos.size());
-            if (from > dtos.size()) return List.of();
+            if (from > dtos.size()) {
+                log.debug("Запрошенный диапазон выходит за пределы списка событий: from={} > size={}", from, dtos.size());
+                return List.of();
+            }
             dtos = dtos.subList(from, toIndex);
         }
 
+        log.info("Возвращено {} событий по публичному запросу", dtos.size());
         return dtos;
     }
 
     @Override
     public EventFullDto getEventById(Long id, String ip) {
-        // Отправляем информацию о "хите" в сервис статистики (дубликат из контроллера, но оставляем)
+        log.info("Начало получения полной информации о публичном событии: id={}, ip={}", id, ip);
+
         try {
             statsClient.hit("ewm-main-service", "/events/" + id, ip, LocalDateTime.now());
+            log.debug("Отправлена статистика о просмотре события: event_id={}, ip={}", id, ip);
         } catch (Exception e) {
-            log.warn("Failed to send hit to stats service: {}", e.getMessage());
+            log.warn("Не удалось отправить данные в сервис статистики: {}", e.getMessage());
         }
 
         Event event = eventRepository.findByIdAndState(id, State.PUBLISHED)
-                .orElseThrow(() -> new NotFoundException("Event with id=" + id + " not found or not published"));
+                .orElseThrow(() -> {
+                    log.warn("Событие с ID {} не найдено или не опубликовано", id);
+                    return new NotFoundException("Event with id=" + id + " not found or not published");
+                });
+
+        log.debug("Событие найдено: title='{}', publishedOn={}", event.getTitle(), event.getPublishedOn());
 
         Long confirmedRequests = requestRepository.countByEventIdAndStatus(id, RequestStatus.CONFIRMED);
         Map<Long, Long> viewsMap = getViewsForEvents(List.of(event));
@@ -128,12 +147,18 @@ public class PublicEventServiceImpl implements PublicEventService {
         dto.setConfirmedRequests(confirmedRequests);
         dto.setViews(viewsMap.getOrDefault(id, 0L));
 
+        log.info("Событие возвращено: id={}, title='{}', views={}, confirmedRequests={}",
+                dto.getId(), dto.getTitle(), dto.getViews(), dto.getConfirmedRequests());
         return dto;
     }
 
     private Map<Long, Long> getConfirmedRequestsMap(List<Long> eventIds) {
-        if (eventIds.isEmpty()) return Collections.emptyMap();
+        if (eventIds.isEmpty()) {
+            log.debug("Список eventIds пуст, возвращаем пустую карту подтверждённых заявок");
+            return Collections.emptyMap();
+        }
 
+        log.debug("Получение количества подтверждённых заявок для {} событий", eventIds.size());
         return requestRepository.findAllByEventIdInAndStatus(eventIds, RequestStatus.CONFIRMED).stream()
                 .collect(Collectors.groupingBy(
                         req -> req.getEvent().getId(),
@@ -142,7 +167,10 @@ public class PublicEventServiceImpl implements PublicEventService {
     }
 
     private Map<Long, Long> getViewsForEvents(List<Event> events) {
-        if (events.isEmpty()) return Collections.emptyMap();
+        if (events.isEmpty()) {
+            log.debug("Список событий пуст, возвращаем пустую карту просмотров");
+            return Collections.emptyMap();
+        }
 
         List<String> uris = events.stream()
                 .map(e -> "/events/" + e.getId())
@@ -153,6 +181,8 @@ public class PublicEventServiceImpl implements PublicEventService {
                 .filter(Objects::nonNull)
                 .min(LocalDateTime::compareTo)
                 .orElse(DISTANT_PAST);
+
+        log.debug("Запрос статистики просмотров для {} событий, начиная с {}", events.size(), start);
 
         try {
             List<ViewStatsDto> stats = statsClient.getStats(start, LocalDateTime.now(), uris, true);
@@ -165,10 +195,11 @@ public class PublicEventServiceImpl implements PublicEventService {
                     viewsMap.put(eventId, stat.getHits());
                 }
             }
+            log.debug("Получены данные просмотров для {} событий", viewsMap.size());
             return viewsMap;
         } catch (Exception e) {
-            log.warn("Failed to get stats from stats service: {}", e.getMessage());
-            return new HashMap<>(); // Возвращаем 0 views в случае ошибки
+            log.warn("Не удалось получить статистику просмотров: {}", e.getMessage());
+            return new HashMap<>();
         }
     }
 }

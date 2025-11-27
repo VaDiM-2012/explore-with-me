@@ -4,59 +4,61 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.ewm.compilation.dto.CompilationDto;
 import ru.practicum.ewm.compilation.service.CompilationService;
-import ru.practicum.stats.client.StatsClient; // Импорт клиента статистики
-import jakarta.servlet.http.HttpServletRequest; // Импорт для доступа к данным запроса
-
-import java.time.LocalDateTime; // Импорт для получения текущего времени
-
+import ru.practicum.stats.client.StatsClient;
+import jakarta.servlet.http.HttpServletRequest;
+import java.time.LocalDateTime;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @RestController
 @RequestMapping("/compilations")
 @RequiredArgsConstructor
 public class PublicCompilationController {
 
-    // Используем константу для имени сервиса при отправке статистики
     private static final String APP_NAME = "ewm-main-service";
+    private static final Logger log = LoggerFactory.getLogger(PublicCompilationController.class);
 
     private final CompilationService service;
-    private final StatsClient statsClient; // Инжекция клиента статистики
+    private final StatsClient statsClient;
 
     @GetMapping
     public List<CompilationDto> getCompilations(
             @RequestParam(required = false) Boolean pinned,
             @RequestParam(defaultValue = "0") Integer from,
             @RequestParam(defaultValue = "10") Integer size,
-            HttpServletRequest request // Добавление объекта запроса для получения IP и URI
+            HttpServletRequest request
     ) {
-        // Отправляем информацию о "хите" в сервис статистики
+        log.info("Получен публичный запрос GET /compilations — получение подборок: pinned={}, from={}, size={}", pinned, from, size);
 
         statsClient.hit(
                 APP_NAME,
-                request.getRequestURI(),    // Получаем URI запроса
-                request.getRemoteAddr(),    // Получаем IP-адрес клиента
-                LocalDateTime.now()         // Текущее время
+                request.getRequestURI(),
+                request.getRemoteAddr(),
+                LocalDateTime.now()
         );
 
-
-        return service.getCompilations(pinned, from, size);
+        List<CompilationDto> compilations = service.getCompilations(pinned, from, size);
+        log.info("Найдено {} подборок", compilations.size());
+        return compilations;
     }
 
     @GetMapping("/{compId}")
     public CompilationDto getCompilationById(
             @PathVariable Long compId,
-            HttpServletRequest request // Добавление объекта запроса для получения IP и URI
+            HttpServletRequest request
     ) {
-        // Отправляем информацию о "хите" в сервис статистики
+        log.info("Получен публичный запрос GET /compilations/{} — получение подборки по ID", compId);
 
         statsClient.hit(
                 APP_NAME,
-                request.getRequestURI(),    // Получаем URI запроса (включая compId)
-                request.getRemoteAddr(),    // Получаем IP-адрес клиента
-                LocalDateTime.now()         // Текущее время
+                request.getRequestURI(),
+                request.getRemoteAddr(),
+                LocalDateTime.now()
         );
 
-
-        return service.getCompilationById(compId);
+        CompilationDto compilation = service.getCompilationById(compId);
+        log.info("Подборка найдена: ID={}, title='{}'", compilation.getId(), compilation.getTitle());
+        return compilation;
     }
 }
