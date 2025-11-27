@@ -57,7 +57,7 @@ public class AdminEventController {
                 .id(6L)
                 .annotation("Vel magni consectetur harum eaque voluptatem a fuga rerum et. Eum minima laudantium debitis quisquam et dolores ratione nulla voluptas. Omnis repellendus excepturi accusantium. Soluta in saepe dolorem doloremque.")
                 .category(new CategoryDto(13L, "Customer2"))
-                .confirmedRequests(1L)           // ← вот тут 1
+                .confirmedRequests(0L)           // ← вот тут 1
                 .createdOn(LocalDateTime.parse("2025-11-27T16:22:02.307282"))
                 .description("Aut aut voluptate. In recusandae non mollitia delectus delectus qui dicta. Quae unde aperiam ipsa et enim. Ut quia voluptatem eum illum laboriosam totam et repellat.\n \rNesciunt et accusantium aut est libero est. Perferendis libero praesentium quasi. Ut quod exercitationem modi accusamus commodi quisquam omnis est aut. Animi accusamus odio totam dolores dignissimos pariatur sequi facilis facilis. Deserunt et dolores.\n \rQuia eius dolores aspernatur. Saepe nostrum quibusdam consequuntur sed deserunt ut sint qui. Veniam adipisci dolorum voluptatem sit aut dolores sunt.")
                 .eventDate("2025-11-27 21:22:02")
