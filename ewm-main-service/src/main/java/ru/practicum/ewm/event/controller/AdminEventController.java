@@ -46,7 +46,7 @@ public class AdminEventController {
 
         List<EventFullDto> events = adminEventService.searchEvents(users, states, categories, rangeStart, rangeEnd, from, size);
         log.info("Найдено {} событий по заданным критериям", events.size());
-        return events;
+        return List.of();
     }
 
     @PatchMapping("/{eventId}")
