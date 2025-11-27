@@ -1,5 +1,6 @@
 package ru.practicum.ewm.event.repository;
 
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -17,22 +18,20 @@ public interface EventRepository extends JpaRepository<Event, Long> {
 
     Optional<Event> findByInitiatorIdAndId(Long userId, Long eventId);
 
-    @Query(value = """
-    SELECT e.* FROM events e
-    WHERE (:users      IS NULL OR e.initiator_id IN (SELECT UNNEST(CAST(:users      AS BIGINT[]))))
-      AND (:states     IS NULL OR e.state::text     IN (SELECT UNNEST(CAST(:states     AS TEXT[]))))
-      AND (:categories IS NULL OR e.category_id     IN (SELECT UNNEST(CAST(:categories AS BIGINT[]))))
-      AND (:rangeStart IS NULL OR e.event_date >= :rangeStart)
-      AND (:rangeEnd   IS NULL OR e.event_date <= :rangeEnd)
-    ORDER BY e.id ASC
-    """, nativeQuery = true)
-    List<Event> findAllByAdminFilters(
-            @Param("users")      List<Long> users,
-            @Param("states")     List<String> states,
-            @Param("categories") List<Long> categories,
-            @Param("rangeStart") LocalDateTime rangeStart,
-            @Param("rangeEnd")   LocalDateTime rangeEnd,
-            Pageable pageable);
+    @Query(value = "SELECT e FROM Event e " +
+            "JOIN FETCH e.initiator i " +  // Принудительно загружаем инициатора
+            "JOIN FETCH e.category c " +   // Принудительно загружаем категорию
+            "WHERE (:users IS NULL OR i.id IN :users) " +
+            "AND (:states IS NULL OR e.state IN :states) " +
+            "AND (:categories IS NULL OR c.id IN :categories) " +
+            "AND (cast(:rangeStart as timestamp) IS NULL OR e.eventDate >= :rangeStart) " +
+            "AND (cast(:rangeEnd as timestamp) IS NULL OR e.eventDate <= :rangeEnd) ")
+    Page<Event> findAllByAdminFilters(@Param("users") List<Long> users,
+                                      @Param("states") List<String> states,
+                                      @Param("categories") List<Long> categories,
+                                      @Param("rangeStart") LocalDateTime rangeStart,
+                                      @Param("rangeEnd") LocalDateTime rangeEnd,
+                                      Pageable pageable);
 
     // === Public API: поиск опубликованных событий ===
     @Query("""
