@@ -1,6 +1,8 @@
 package ru.practicum.ewm.event.service;
 
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -34,6 +36,8 @@ public class PublicEventServiceImpl implements PublicEventService {
     private final EventMapper eventMapper;
     private final StatsClient statsClient;
 
+    private static final Logger log = LoggerFactory.getLogger(PublicEventServiceImpl.class);
+
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final LocalDateTime DISTANT_PAST = LocalDateTime.of(1970, 1, 1, 0, 0, 0);
     private static final Pattern EVENT_URI_PATTERN = Pattern.compile("^/events/(\\d+)$");
@@ -50,7 +54,12 @@ public class PublicEventServiceImpl implements PublicEventService {
                                          Integer size,
                                          String ip) {
 
-        statsClient.hit("ewm-main-service", "/events", ip, LocalDateTime.now());
+        // Отправляем информацию о "хите" в сервис статистики (дубликат из контроллера, но оставляем)
+        try {
+            statsClient.hit("ewm-main-service", "/events", ip, LocalDateTime.now());
+        } catch (Exception e) {
+            log.warn("Failed to send hit to stats service: {}", e.getMessage());
+        }
 
         LocalDateTime start = rangeStart != null ? rangeStart : LocalDateTime.now();
         LocalDateTime end = rangeEnd != null ? rangeEnd : LocalDateTime.now().plusYears(100);
@@ -102,7 +111,12 @@ public class PublicEventServiceImpl implements PublicEventService {
 
     @Override
     public EventFullDto getEventById(Long id, String ip) {
-        statsClient.hit("ewm-main-service", "/events/" + id, ip, LocalDateTime.now());
+        // Отправляем информацию о "хите" в сервис статистики (дубликат из контроллера, но оставляем)
+        try {
+            statsClient.hit("ewm-main-service", "/events/" + id, ip, LocalDateTime.now());
+        } catch (Exception e) {
+            log.warn("Failed to send hit to stats service: {}", e.getMessage());
+        }
 
         Event event = eventRepository.findByIdAndState(id, State.PUBLISHED)
                 .orElseThrow(() -> new NotFoundException("Event with id=" + id + " not found or not published"));
@@ -140,16 +154,21 @@ public class PublicEventServiceImpl implements PublicEventService {
                 .min(LocalDateTime::compareTo)
                 .orElse(DISTANT_PAST);
 
-        List<ViewStatsDto> stats = statsClient.getStats(start, LocalDateTime.now(), uris, true);
+        try {
+            List<ViewStatsDto> stats = statsClient.getStats(start, LocalDateTime.now(), uris, true);
 
-        Map<Long, Long> viewsMap = new HashMap<>();
-        for (ViewStatsDto stat : stats) {
-            Matcher matcher = EVENT_URI_PATTERN.matcher(stat.getUri());
-            if (matcher.matches()) {
-                Long eventId = Long.parseLong(matcher.group(1));
-                viewsMap.put(eventId, stat.getHits());
+            Map<Long, Long> viewsMap = new HashMap<>();
+            for (ViewStatsDto stat : stats) {
+                Matcher matcher = EVENT_URI_PATTERN.matcher(stat.getUri());
+                if (matcher.matches()) {
+                    Long eventId = Long.parseLong(matcher.group(1));
+                    viewsMap.put(eventId, stat.getHits());
+                }
             }
+            return viewsMap;
+        } catch (Exception e) {
+            log.warn("Failed to get stats from stats service: {}", e.getMessage());
+            return new HashMap<>(); // Возвращаем 0 views в случае ошибки
         }
-        return viewsMap;
     }
 }
