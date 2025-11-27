@@ -59,7 +59,7 @@ services:
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
       STATS_SERVER_URL: http://stats-server:9090
       SERVER_PORT: 8080
-      TZ: Europe/Moscow
+#      TZ: Europe/Moscow
     depends_on:
       - ewm-db
       - stats-server
