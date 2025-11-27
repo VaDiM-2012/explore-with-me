@@ -37,6 +37,7 @@ public class ParticipationRequest {
 
     @PrePersist
     protected void onCreate() {
-        created = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now();
+        created = now.withNano((now.getNano() / 1000) * 1000);
     }
 }

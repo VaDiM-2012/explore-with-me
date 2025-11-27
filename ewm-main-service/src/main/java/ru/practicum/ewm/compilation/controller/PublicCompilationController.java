@@ -6,6 +6,7 @@ import ru.practicum.ewm.compilation.dto.CompilationDto;
 import ru.practicum.ewm.compilation.service.CompilationService;
 import ru.practicum.stats.client.StatsClient; // Импорт клиента статистики
 import jakarta.servlet.http.HttpServletRequest; // Импорт для доступа к данным запроса
+
 import java.time.LocalDateTime; // Импорт для получения текущего времени
 
 import java.util.List;
@@ -29,12 +30,14 @@ public class PublicCompilationController {
             HttpServletRequest request // Добавление объекта запроса для получения IP и URI
     ) {
         // Отправляем информацию о "хите" в сервис статистики
+
         statsClient.hit(
                 APP_NAME,
                 request.getRequestURI(),    // Получаем URI запроса
                 request.getRemoteAddr(),    // Получаем IP-адрес клиента
                 LocalDateTime.now()         // Текущее время
         );
+
 
         return service.getCompilations(pinned, from, size);
     }
@@ -45,12 +48,14 @@ public class PublicCompilationController {
             HttpServletRequest request // Добавление объекта запроса для получения IP и URI
     ) {
         // Отправляем информацию о "хите" в сервис статистики
+
         statsClient.hit(
                 APP_NAME,
                 request.getRequestURI(),    // Получаем URI запроса (включая compId)
                 request.getRemoteAddr(),    // Получаем IP-адрес клиента
                 LocalDateTime.now()         // Текущее время
         );
+
 
         return service.getCompilationById(compId);
     }
