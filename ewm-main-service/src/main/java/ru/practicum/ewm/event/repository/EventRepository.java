@@ -18,14 +18,14 @@ public interface EventRepository extends JpaRepository<Event, Long> {
 
     Optional<Event> findByInitiatorIdAndId(Long userId, Long eventId);
 
-    @Query(value = "SELECT e FROM Event e " +
-            "JOIN FETCH e.initiator i " +  // Принудительно загружаем инициатора
-            "JOIN FETCH e.category c " +   // Принудительно загружаем категорию
+    @Query("SELECT e FROM Event e " +
+            "JOIN FETCH e.initiator i " +
+            "JOIN FETCH e.category c " +
             "WHERE (:users IS NULL OR i.id IN :users) " +
             "AND (:states IS NULL OR e.state IN :states) " +
             "AND (:categories IS NULL OR c.id IN :categories) " +
-            "AND (cast(:rangeStart as timestamp) IS NULL OR e.eventDate >= :rangeStart) " +
-            "AND (cast(:rangeEnd as timestamp) IS NULL OR e.eventDate <= :rangeEnd) ")
+            "AND (:rangeStart IS NULL OR e.eventDate >= :rangeStart) " +
+            "AND (:rangeEnd IS NULL OR e.eventDate <= :rangeEnd)")
     Page<Event> findAllByAdminFilters(@Param("users") List<Long> users,
                                       @Param("states") List<State> states,
                                       @Param("categories") List<Long> categories,
@@ -55,7 +55,6 @@ public interface EventRepository extends JpaRepository<Event, Long> {
             @Param("end") LocalDateTime end,
             Pageable pageable);
 
-    // === Public API: получение одного опубликованного события ===
     @Query("SELECT e FROM Event e WHERE e.id = :id AND e.state = :state")
     Optional<Event> findByIdAndState(@Param("id") Long id, @Param("state") State state);
 }
