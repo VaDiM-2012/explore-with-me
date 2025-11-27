@@ -8,6 +8,7 @@ import ru.practicum.ewm.event.dto.UpdateEventAdminRequest;
 import ru.practicum.ewm.event.service.AdminEventService;
 
 import jakarta.validation.Valid;
+import ru.practicum.ewm.exception.ValidationException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -30,7 +31,9 @@ public class AdminEventController {
             @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime rangeEnd,
             @RequestParam(defaultValue = "0") Integer from,
             @RequestParam(defaultValue = "10") Integer size) {
-
+        if (rangeStart != null && rangeEnd != null && !rangeEnd.isAfter(rangeStart)) {
+            throw new ValidationException("Invalid date range: rangeEnd must be after rangeStart");
+        }
         return adminEventService.searchEvents(users, states, categories, rangeStart, rangeEnd, from, size);
     }
 

@@ -62,10 +62,8 @@ public class AdminEventServiceImpl implements AdminEventService {
         if (request.getLocation() != null) event.setLocation(request.getLocation());
 
         if (request.getEventDate() != null) {
-            if (request.getStateAction() == StateActionAdmin.PUBLISH_EVENT) {
-                if (request.getEventDate().isBefore(LocalDateTime.now().plusHours(1))) {
-                    throw new ConflictException("Event date must be at least 1 hour after publication");
-                }
+            if (request.getEventDate().isBefore(LocalDateTime.now().plusHours(2))) {
+                throw new ru.practicum.ewm.exception.ValidationException("Event date must be at least 2 hours in the future");
             }
             event.setEventDate(request.getEventDate());
         }

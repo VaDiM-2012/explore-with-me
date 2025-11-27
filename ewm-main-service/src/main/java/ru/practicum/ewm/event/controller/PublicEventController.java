@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.*;
 import ru.practicum.ewm.event.dto.EventFullDto;
 import ru.practicum.ewm.event.dto.EventShortDto;
 import ru.practicum.ewm.event.service.PublicEventService;
+import ru.practicum.ewm.exception.ValidationException;
 import ru.practicum.stats.client.StatsClient; // Импорт клиента статистики
 import java.time.LocalDateTime; // Импорт для получения текущего времени
 
@@ -35,6 +36,10 @@ public class PublicEventController {
             @RequestParam(defaultValue = "0") Integer from,
             @RequestParam(defaultValue = "10") Integer size,
             HttpServletRequest request) {
+
+        if (rangeStart != null && rangeEnd != null && !rangeEnd.isAfter(rangeStart)) {
+            throw new ValidationException("Invalid date range: rangeEnd must be after rangeStart");
+        }
 
         String ip = request.getRemoteAddr();
 
