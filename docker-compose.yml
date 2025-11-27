@@ -63,6 +63,8 @@ services:
     depends_on:
       - ewm-db
       - stats-server
+    volumes:
+      - ./ewm-main-service.log:/app/logs/ewm-main-service.log
 
 networks:
   default:
