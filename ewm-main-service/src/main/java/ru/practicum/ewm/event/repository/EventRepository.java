@@ -19,8 +19,8 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     Optional<Event> findByInitiatorIdAndId(Long userId, Long eventId);
 
     @Query(value = "SELECT e FROM Event e " +
-            "JOIN FETCH e.initiator i " +  // Принудительно загружаем инициатора
-            "JOIN FETCH e.category c " +   // Принудительно загружаем категорию
+            "JOIN FETCH e.initiator i " +
+            "JOIN FETCH e.category c " +
             "WHERE (:users IS NULL OR i.id IN :users) " +
             "AND (:states IS NULL OR e.state IN :states) " +
             "AND (:categories IS NULL OR c.id IN :categories) " +
@@ -34,13 +34,16 @@ public interface EventRepository extends JpaRepository<Event, Long> {
                                       Pageable pageable);
 
     // === Public API: поиск опубликованных событий ===
+    // Примечание: для решения ошибки "lower(bytea) does not exist" требуется
+    // изменить тип столбцов annotation, title, description в БД на TEXT/VARCHAR.
+    // Запрос в JPQL ниже написан корректно для строковых полей.
     @Query("""
             SELECT e FROM Event e
             WHERE e.state = 'PUBLISHED'
               AND (:text IS NULL OR
-                   LOWER(e.annotation) LIKE LOWER(CONCAT('%', :text, '%')) OR
-                   LOWER(e.title) LIKE LOWER(CONCAT('%', :text, '%')) OR
-                   LOWER(e.description) LIKE LOWER(CONCAT('%', :text, '%')))
+                   LOWER(e.annotation) LIKE LOWER(CONCAT('%', CAST(:text AS string), '%')) OR
+                   LOWER(e.title) LIKE LOWER(CONCAT('%', CAST(:text AS string), '%')) OR
+                   LOWER(e.description) LIKE LOWER(CONCAT('%', CAST(:text AS string), '%')))
               AND (:categories IS NULL OR e.category.id IN :categories)
               AND (:paid IS NULL OR e.paid = :paid)
               AND e.eventDate >= :start

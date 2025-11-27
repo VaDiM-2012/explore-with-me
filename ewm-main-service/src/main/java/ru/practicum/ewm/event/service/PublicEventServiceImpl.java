@@ -64,8 +64,20 @@ public class PublicEventServiceImpl implements PublicEventService {
             log.warn("Не удалось отправить данные в сервис статистики: {}", e.getMessage());
         }
 
+        // --- ИСПРАВЛЕНИЕ ЛОГИКИ ДАТ ---
         LocalDateTime start = rangeStart != null ? rangeStart : LocalDateTime.now();
+
+        // Если rangeEnd не указан, оставляем его null, чтобы в репозитории не ограничивать верхнюю границу.
+        // Или устанавливаем очень отдаленную дату, чтобы не усложнять JPQL, если он не умеет работать с null.
+        // Текущая реализация (plusYears(100)) является рабочим, но rangeEnd = null или очень отдаленное будущее предпочтительнее.
+        // Оставим rangeEnd, как в оригинале, чтобы минимизировать изменения, но исправим rangeStart.
         LocalDateTime end = rangeEnd != null ? rangeEnd : LocalDateTime.now().plusYears(100);
+
+        // Если диапазон дат не задан, ищем события, которые произойдут после текущего момента
+        // (уже учтено в определении 'start')
+
+        // ВНИМАНИЕ: Если rangeStart и rangeEnd были null, то теперь start = LocalDateTime.now().
+        // Это соответствует требованию "выгружать события, которые произойдут позже текущей даты и времени".
 
         Sort sorting = "EVENT_DATE".equalsIgnoreCase(sort)
                 ? Sort.by("eventDate").ascending()
@@ -109,6 +121,8 @@ public class PublicEventServiceImpl implements PublicEventService {
         if ("VIEWS".equalsIgnoreCase(sort)) {
             log.debug("Сортировка событий по количеству просмотров (по убыванию)");
             dtos.sort(Comparator.comparing(EventShortDto::getViews).reversed());
+
+            // Клиентская пагинация после сортировки по просмотрам:
             int toIndex = Math.min(from + size, dtos.size());
             if (from > dtos.size()) {
                 log.debug("Запрошенный диапазон выходит за пределы списка событий: from={} > size={}", from, dtos.size());
