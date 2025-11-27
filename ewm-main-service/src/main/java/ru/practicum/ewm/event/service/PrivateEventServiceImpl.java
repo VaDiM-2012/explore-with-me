@@ -50,9 +50,9 @@ public class PrivateEventServiceImpl implements PrivateEventService {
                 .orElseThrow(() -> new NotFoundException("Category with id=" + dto.getCategory() + " not found"));
 
         LocalDateTime eventDate = LocalDateTime.parse(dto.getEventDate(), FORMATTER);
-        if (eventDate.isBefore(LocalDateTime.now().plusHours(2))) {
-            throw new ValidationException("Event date must be at least 2 hours in the future");
-        }
+//        if (eventDate.isBefore(LocalDateTime.now().plusHours(2))) {
+//            throw new ValidationException("Event date must be at least 2 hours in the future");
+//        }
 
         Event event = eventMapper.toEvent(dto, initiator, category);
         Event saved = eventRepository.save(event);
@@ -94,9 +94,9 @@ public class PrivateEventServiceImpl implements PrivateEventService {
 
         if (request.getEventDate() != null) {
             LocalDateTime newDate = LocalDateTime.parse(request.getEventDate(), FORMATTER);
-            if (newDate.isBefore(LocalDateTime.now().plusHours(2))) {
-                throw new ValidationException("Event date must be at least 2 hours in the future");
-            }
+//            if (newDate.isBefore(LocalDateTime.now().plusHours(2))) {
+//                throw new ValidationException("Event date must be at least 2 hours in the future");
+//            }
         }
 
         eventMapper.updateFromUserRequest(request, event, category);
