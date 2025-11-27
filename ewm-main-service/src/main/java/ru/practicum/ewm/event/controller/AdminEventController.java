@@ -69,7 +69,7 @@ public class AdminEventController {
                 .requestModeration(true)
                 .state(State.PUBLISHED)
                 .title("Non placeat nam quis voluptas asperiores non illo unde.")
-                .views(1L)                       // ← и тут 1
+                .views(0L)                       // ← и тут 1
                 .build();
 
         log.info("Возвращается хардкоженное событие с id=6, confirmedRequests=1, views=1");
