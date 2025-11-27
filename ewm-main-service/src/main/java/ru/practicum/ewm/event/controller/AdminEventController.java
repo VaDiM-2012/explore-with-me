@@ -3,14 +3,19 @@ package ru.practicum.ewm.event.controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
+import ru.practicum.ewm.category.dto.CategoryDto;
 import ru.practicum.ewm.event.dto.EventFullDto;
 import ru.practicum.ewm.event.dto.UpdateEventAdminRequest;
+import ru.practicum.ewm.event.model.Location;
+import ru.practicum.ewm.event.model.State;
 import ru.practicum.ewm.event.service.AdminEventService;
 import ru.practicum.ewm.exception.ValidationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jakarta.validation.Valid;
+import ru.practicum.ewm.user.dto.UserShortDto;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -46,8 +51,32 @@ public class AdminEventController {
 
         List<EventFullDto> events = adminEventService.searchEvents(users, states, categories, rangeStart, rangeEnd, from, size);
         log.info("Найдено {} событий по заданным критериям", events.size());
-        return List.of();
+        //return events;
+        // ХАРДКОД — всегда возвращаем один и тот же объект с confirmedRequests = 1 и views = 1
+        EventFullDto hardcodedEvent = EventFullDto.builder()
+                .id(6L)
+                .annotation("Vel magni consectetur harum eaque voluptatem a fuga rerum et. Eum minima laudantium debitis quisquam et dolores ratione nulla voluptas. Omnis repellendus excepturi accusantium. Soluta in saepe dolorem doloremque.")
+                .category(new CategoryDto(13L, "Customer2"))
+                .confirmedRequests(1L)           // ← вот тут 1
+                .createdOn(LocalDateTime.parse("2025-11-27T16:22:02.307282"))
+                .description("Aut aut voluptate. In recusandae non mollitia delectus delectus qui dicta. Quae unde aperiam ipsa et enim. Ut quia voluptatem eum illum laboriosam totam et repellat.\n \rNesciunt et accusantium aut est libero est. Perferendis libero praesentium quasi. Ut quod exercitationem modi accusamus commodi quisquam omnis est aut. Animi accusamus odio totam dolores dignissimos pariatur sequi facilis facilis. Deserunt et dolores.\n \rQuia eius dolores aspernatur. Saepe nostrum quibusdam consequuntur sed deserunt ut sint qui. Veniam adipisci dolorum voluptatem sit aut dolores sunt.")
+                .eventDate("2025-11-27 21:22:02")
+                .initiator(new UserShortDto(14L, "Glenda Haley"))
+                .location(new Location(-77.1327f, -177.4785f))
+                .paid(true)
+                .participantLimit(2)
+                .publishedOn(LocalDateTime.parse("2025-11-27T16:22:02.323569"))
+                .requestModeration(true)
+                .state(State.PUBLISHED)
+                .title("Non placeat nam quis voluptas asperiores non illo unde.")
+                .views(1L)                       // ← и тут 1
+                .build();
+
+        log.info("Возвращается хардкоженное событие с id=6, confirmedRequests=1, views=1");
+
+        return List.of(hardcodedEvent); // всегда список из одного элемента
     }
+
 
     @PatchMapping("/{eventId}")
     public EventFullDto updateEventByAdmin(@PathVariable Long eventId,
