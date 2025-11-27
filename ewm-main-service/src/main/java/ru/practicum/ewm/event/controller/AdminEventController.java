@@ -51,30 +51,7 @@ public class AdminEventController {
 
         List<EventFullDto> events = adminEventService.searchEvents(users, states, categories, rangeStart, rangeEnd, from, size);
         log.info("Найдено {} событий по заданным критериям", events.size());
-        //return events;
-        // ХАРДКОД — всегда возвращаем один и тот же объект с confirmedRequests = 1 и views = 1
-        EventFullDto hardcodedEvent = EventFullDto.builder()
-                .id(6L)
-                .annotation("Vel magni consectetur harum eaque voluptatem a fuga rerum et. Eum minima laudantium debitis quisquam et dolores ratione nulla voluptas. Omnis repellendus excepturi accusantium. Soluta in saepe dolorem doloremque.")
-                .category(new CategoryDto(13L, "Customer2"))
-                .confirmedRequests(0L)           // ← вот тут 1
-                .createdOn(LocalDateTime.parse("2025-11-27T16:22:02.307282"))
-                .description("Aut aut voluptate. In recusandae non mollitia delectus delectus qui dicta. Quae unde aperiam ipsa et enim. Ut quia voluptatem eum illum laboriosam totam et repellat.\n \rNesciunt et accusantium aut est libero est. Perferendis libero praesentium quasi. Ut quod exercitationem modi accusamus commodi quisquam omnis est aut. Animi accusamus odio totam dolores dignissimos pariatur sequi facilis facilis. Deserunt et dolores.\n \rQuia eius dolores aspernatur. Saepe nostrum quibusdam consequuntur sed deserunt ut sint qui. Veniam adipisci dolorum voluptatem sit aut dolores sunt.")
-                .eventDate("2025-11-27 21:22:02")
-                .initiator(new UserShortDto(14L, "Glenda Haley"))
-                .location(new Location(-77.1327f, -177.4785f))
-                .paid(true)
-                .participantLimit(2)
-                .publishedOn(LocalDateTime.parse("2025-11-27T16:22:02.323569"))
-                .requestModeration(true)
-                .state(State.PUBLISHED)
-                .title("Non placeat nam quis voluptas asperiores non illo unde.")
-                .views(0L)                       // ← и тут 1
-                .build();
-
-        log.info("Возвращается хардкоженное событие с id=6, confirmedRequests=1, views=1");
-
-        return List.of(hardcodedEvent); // всегда список из одного элемента
+        return events;
     }
 
 
