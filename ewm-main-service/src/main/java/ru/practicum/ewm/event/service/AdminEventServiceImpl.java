@@ -19,7 +19,6 @@ import ru.practicum.ewm.exception.NotFoundException;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -39,18 +38,12 @@ public class AdminEventServiceImpl implements AdminEventService {
                                            Integer from,
                                            Integer size) {
 
-        List<State> stateEnums = states != null
-                ? states.stream().map(State::valueOf).collect(Collectors.toList())
-                : null;
-
         var pageable = PageRequest.of(from / size, size, Sort.by("id").ascending());
 
-        List<Event> events = eventRepository.findAllByAdminFilters(
-                users, stateEnums, categories, rangeStart, rangeEnd, pageable);
-
-        return events.stream()
+        return eventRepository.findAllByAdminFilters(users, states, categories, rangeStart, rangeEnd, pageable)
+                .stream()
                 .map(eventMapper::toFullDto)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Override
