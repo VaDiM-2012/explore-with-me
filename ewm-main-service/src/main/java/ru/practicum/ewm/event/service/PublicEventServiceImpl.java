@@ -40,6 +40,9 @@ public class PublicEventServiceImpl implements PublicEventService {
     private static final LocalDateTime DISTANT_PAST = LocalDateTime.of(1970, 1, 1, 0, 0, 0);
     private static final Pattern EVENT_URI_PATTERN = Pattern.compile("^/events/(\\d+)$");
 
+    /**
+     * Публичный поиск событий с возможностью фильтрации и сортировки.
+     */
     @Override
     public List<EventShortDto> getEvents(String text,
                                          List<Long> categories,
@@ -55,21 +58,62 @@ public class PublicEventServiceImpl implements PublicEventService {
         log.info("Начало публичного поиска событий с параметрами: text='{}', categories={}, paid={}, rangeStart={}, rangeEnd={}, onlyAvailable={}, sort={}, from={}, size={}, ip={}",
                 text, categories, paid, rangeStart, rangeEnd, onlyAvailable, sort, from, size, ip);
 
+        // 1. Инициализация параметров поиска и пагинации
+        SearchParameters params = initializeSearchParameters(rangeStart, rangeEnd, sort, from, size);
 
-        // --- ИСПРАВЛЕНИЕ ЛОГИКИ ДАТ ---
-        LocalDateTime start = rangeStart != null ? rangeStart : LocalDateTime.now();
+        // 2. Поиск событий в базе данных
+        List<Event> events = eventRepository.findPublicEvents(text, categories, paid, params.start, params.end, params.page);
+        log.debug("Найдено {} событий по фильтрам до фильтрации по доступности", events.size());
 
-        // Если rangeEnd не указан, оставляем его null, чтобы в репозитории не ограничивать верхнюю границу.
-        // Или устанавливаем очень отдаленную дату, чтобы не усложнять JPQL, если он не умеет работать с null.
-        // Текущая реализация (plusYears(100)) является рабочим, но rangeEnd = null или очень отдаленное будущее предпочтительнее.
-        // Оставим rangeEnd, как в оригинале, чтобы минимизировать изменения, но исправим rangeStart.
-        LocalDateTime end = rangeEnd != null ? rangeEnd : LocalDateTime.now().plusYears(100);
+        // 3. Фильтрация по доступности (если требуется)
+        events = filterByAvailability(events, onlyAvailable);
 
-        // Если диапазон дат не задан, ищем события, которые произойдут после текущего момента
-        // (уже учтено в определении 'start')
+        // 4. Получение статистики (просмотры и подтвержденные заявки)
+        Map<Long, Long> viewsMap = getViewsForEvents(events);
+        Map<Long, Long> confirmedMap = getConfirmedRequestsMap(
+                events.stream().map(Event::getId).collect(Collectors.toList())
+        );
 
-        // ВНИМАНИЕ: Если rangeStart и rangeEnd были null, то теперь start = LocalDateTime.now().
-        // Это соответствует требованию "выгружать события, которые произойдут позже текущей даты и времени".
+        // 5. Преобразование в DTO и обогащение статистикой
+        List<EventShortDto> dtos = enrichDtosWithStats(events, viewsMap, confirmedMap);
+
+        // 6. Сортировка по просмотрам и клиентская пагинация (если требуется)
+        dtos = sortAndPaginateByViews(dtos, sort, from, size);
+
+        log.info("Возвращено {} событий по публичному запросу", dtos.size());
+        return dtos;
+    }
+
+    // --- Приватные вспомогательные методы ---
+
+    /**
+     * Структура для инициализации параметров поиска.
+     */
+    private static class SearchParameters {
+        final LocalDateTime start;
+        final LocalDateTime end;
+        final Sort sorting;
+        final PageRequest page;
+
+        SearchParameters(LocalDateTime start, LocalDateTime end, Sort sorting, PageRequest page) {
+            this.start = start;
+            this.end = end;
+            this.sorting = sorting;
+            this.page = page;
+        }
+    }
+
+    /**
+     * Инициализирует параметры поиска (даты, сортировка, пагинация).
+     */
+    private SearchParameters initializeSearchParameters(LocalDateTime rangeStart,
+                                                        LocalDateTime rangeEnd,
+                                                        String sort,
+                                                        Integer from,
+                                                        Integer size) {
+
+        LocalDateTime start = Optional.ofNullable(rangeStart).orElse(LocalDateTime.now());
+        LocalDateTime end = Optional.ofNullable(rangeEnd).orElse(LocalDateTime.now().plusYears(100));
 
         Sort sorting = "EVENT_DATE".equalsIgnoreCase(sort)
                 ? Sort.by("eventDate").ascending()
@@ -77,30 +121,38 @@ public class PublicEventServiceImpl implements PublicEventService {
 
         PageRequest page = PageRequest.of(from / size, size, sorting);
 
-        List<Event> events = eventRepository.findPublicEvents(text, categories, paid, start, end, page);
-        log.debug("Найдено {} событий по фильтрам", events.size());
+        return new SearchParameters(start, end, sorting, page);
+    }
 
-        // Фильтрация по доступности
+    /**
+     * Фильтрует список событий, оставляя только те, где есть свободные места.
+     */
+    private List<Event> filterByAvailability(List<Event> events, Boolean onlyAvailable) {
         if (Boolean.TRUE.equals(onlyAvailable)) {
             log.debug("Фильтрация событий по доступности участия");
+
+            // Если фильтруем, нужно получить подтвержденные заявки
             Map<Long, Long> confirmedMap = getConfirmedRequestsMap(
                     events.stream().map(Event::getId).collect(Collectors.toList())
             );
+
             int before = events.size();
             events = events.stream()
-                    .filter(e -> e.getParticipantLimit() == 0 ||
+                    .filter(e -> e.getParticipantLimit() == 0 || // Лимит 0 = без ограничений
                             confirmedMap.getOrDefault(e.getId(), 0L) < e.getParticipantLimit())
                     .collect(Collectors.toList());
             log.debug("После фильтрации по доступности осталось {} событий из {}", events.size(), before);
         }
+        return events;
+    }
 
-        // Получение статистики просмотров и подтверждённых заявок
-        Map<Long, Long> viewsMap = getViewsForEvents(events);
-        Map<Long, Long> confirmedMap = getConfirmedRequestsMap(
-                events.stream().map(Event::getId).collect(Collectors.toList())
-        );
-
-        List<EventShortDto> dtos = events.stream()
+    /**
+     * Обогащает DTO событий данными о просмотрах и подтвержденных заявках.
+     */
+    private List<EventShortDto> enrichDtosWithStats(List<Event> events,
+                                                    Map<Long, Long> viewsMap,
+                                                    Map<Long, Long> confirmedMap) {
+        return events.stream()
                 .map(event -> {
                     EventShortDto dto = eventMapper.toShortDto(event);
                     dto.setConfirmedRequests(confirmedMap.getOrDefault(event.getId(), 0L));
@@ -108,22 +160,27 @@ public class PublicEventServiceImpl implements PublicEventService {
                     return dto;
                 })
                 .collect(Collectors.toList());
+    }
 
-        // Сортировка по просмотрам на стороне клиента
+    /**
+     * Сортирует DTO событий по просмотрам (если требуется) и выполняет клиентскую пагинацию.
+     */
+    private List<EventShortDto> sortAndPaginateByViews(List<EventShortDto> dtos,
+                                                       String sort,
+                                                       Integer from,
+                                                       Integer size) {
         if ("VIEWS".equalsIgnoreCase(sort)) {
             log.debug("Сортировка событий по количеству просмотров (по убыванию)");
             dtos.sort(Comparator.comparing(EventShortDto::getViews).reversed());
 
             // Клиентская пагинация после сортировки по просмотрам:
             int toIndex = Math.min(from + size, dtos.size());
-            if (from > dtos.size()) {
-                log.debug("Запрошенный диапазон выходит за пределы списка событий: from={} > size={}", from, dtos.size());
+            if (from >= dtos.size()) {
+                log.debug("Запрошенный диапазон выходит за пределы списка событий: from={} >= size={}", from, dtos.size());
                 return List.of();
             }
             dtos = dtos.subList(from, toIndex);
         }
-
-        log.info("Возвращено {} событий по публичному запросу", dtos.size());
         return dtos;
     }
 

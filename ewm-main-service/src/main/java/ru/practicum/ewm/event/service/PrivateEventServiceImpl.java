@@ -24,6 +24,7 @@ import ru.practicum.ewm.user.repository.UserRepository;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static org.springframework.data.domain.PageRequest.of;
@@ -41,29 +42,19 @@ public class PrivateEventServiceImpl implements PrivateEventService {
     private final EventMapper eventMapper;
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final int MIN_HOURS_BEFORE_EVENT = 2; // Минимальное время до события
+
+    // --- Методы, которые не менялись, для полноты класса ---
 
     @Override
     @Transactional
     public EventFullDto createEvent(Long userId, NewEventDto dto) {
         log.info("Начало создания события пользователем с ID: {}", userId);
 
-        User initiator = userRepository.findById(userId)
-                .orElseThrow(() -> {
-                    log.warn("Пользователь с ID {} не найден при создании события", userId);
-                    return new NotFoundException("User with id=" + userId + " not found");
-                });
+        User initiator = findUserOrThrow(userId);
+        Category category = findCategoryOrThrow(dto.getCategory());
 
-        Category category = categoryRepository.findById(dto.getCategory())
-                .orElseThrow(() -> {
-                    log.warn("Категория с ID {} не найдена при создании события", dto.getCategory());
-                    return new NotFoundException("Category with id=" + dto.getCategory() + " not found");
-                });
-
-        LocalDateTime eventDate = LocalDateTime.parse(dto.getEventDate(), FORMATTER);
-        if (eventDate.isBefore(LocalDateTime.now().plusHours(2))) {
-            log.warn("Попытка создания события с датой раньше чем через 2 часа: {}", eventDate);
-            throw new ValidationException("Event date must be at least 2 hours in the future");
-        }
+        LocalDateTime eventDate = parseAndValidateEventDate(dto.getEventDate());
 
         Event event = eventMapper.toEvent(dto, initiator, category);
         Event saved = eventRepository.save(event);
@@ -93,65 +84,120 @@ public class PrivateEventServiceImpl implements PrivateEventService {
     public EventFullDto getUserEventById(Long userId, Long eventId) {
         log.info("Получен запрос на получение события: userId={}, eventId={}", userId, eventId);
 
-        Event event = eventRepository.findByInitiatorIdAndId(userId, eventId)
-                .orElseThrow(() -> {
-                    log.warn("Событие с ID {} не найдено для пользователя {}", eventId, userId);
-                    return new NotFoundException("Event with id=" + eventId + " for user=" + userId + " not found");
-                });
+        Event event = findUserEventOrThrow(userId, eventId);
 
         log.info("Событие найдено: ID={}, title='{}', state={}", event.getId(), event.getTitle(), event.getState());
         return eventMapper.toFullDto(event);
     }
 
+    // --- Рефакторинг метода updateEvent ---
+
+    /**
+     * Обновление события пользователем.
+     */
     @Override
     @Transactional
     public EventFullDto updateEvent(Long userId, Long eventId, UpdateEventUserRequest request) {
         log.info("Начало обновления события: userId={}, eventId={}, action={}", userId, eventId, request.getStateAction());
 
-        Event event = eventRepository.findByInitiatorIdAndId(userId, eventId)
-                .orElseThrow(() -> {
-                    log.warn("Событие с ID {} не найдено для пользователя {} при обновлении", eventId, userId);
-                    return new NotFoundException("Event with id=" + eventId + " for user=" + userId + " not found");
-                });
+        Event event = findUserEventOrThrow(userId, eventId);
 
-        if (!event.getState().equals(State.PENDING) && !event.getState().equals(State.CANCELED)) {
-            log.warn("Невозможно обновить событие {}: текущий статус — {}", eventId, event.getState());
-            throw new ConflictException("Only PENDING or CANCELED events can be updated");
-        }
+        // 1. Проверка на возможность обновления (PENDING или CANCELED)
+        validateUpdatableState(event);
 
-        Category category = null;
-        if (request.getCategory() != null) {
-            category = categoryRepository.findById(request.getCategory())
-                    .orElseThrow(() -> {
-                        log.warn("Категория с ID {} не найдена при обновлении события", request.getCategory());
-                        return new NotFoundException("Category with id=" + request.getCategory() + " not found");
-                    });
-            log.debug("Категория {} будет обновлена для события {}", request.getCategory(), eventId);
-        }
+        // 2. Получение категории (если передана)
+        Category category = findCategoryIfPresent(request.getCategory());
 
-        if (request.getEventDate() != null) {
-            LocalDateTime newDate = LocalDateTime.parse(request.getEventDate(), FORMATTER);
-            if (newDate.isBefore(LocalDateTime.now().plusHours(2))) {
-                log.warn("Попытка установить дату события {} ранее чем через 2 часа: {}", eventId, newDate);
-                throw new ValidationException("Event date must be at least 2 hours in the future");
-            }
-            log.debug("Дата события {} будет обновлена на {}", eventId, newDate);
-        }
+        // 3. Валидация новой даты события (если передана)
+        validateNewEventDateIfPresent(eventId, request.getEventDate());
 
+        // 4. Обновление полей с использованием маппера
         eventMapper.updateFromUserRequest(request, event, category);
 
-        if (request.getStateAction() != null) {
-            if (request.getStateAction() == StateActionUser.SEND_TO_REVIEW) {
-                event.setState(State.PENDING);
-                log.info("Событие {} отправлено на модерацию", eventId);
-            } else if (request.getStateAction() == StateActionUser.CANCEL_REVIEW) {
-                event.setState(State.CANCELED);
-                log.info("Событие {} отменено инициатором", eventId);
-            }
-        }
+        // 5. Обработка действия с состоянием
+        processEventStateAction(event, request.getStateAction());
 
+        // 6. Сохранение и возврат результата
         Event updated = eventRepository.save(event);
         log.info("Событие {} успешно обновлено, новый статус: {}", updated.getId(), updated.getState());
         return eventMapper.toFullDto(updated);
+    }
+
+    // --- Приватные вспомогательные методы для читаемости ---
+
+    private User findUserOrThrow(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> {
+                    log.warn("Пользователь с ID {} не найден", userId);
+                    return new NotFoundException("User with id=" + userId + " not found");
+                });
+    }
+
+    private Category findCategoryOrThrow(Long categoryId) {
+        return categoryRepository.findById(categoryId)
+                .orElseThrow(() -> {
+                    log.warn("Категория с ID {} не найдена", categoryId);
+                    return new NotFoundException("Category with id=" + categoryId + " not found");
+                });
+    }
+
+    private Category findCategoryIfPresent(Long categoryId) {
+        if (categoryId == null) {
+            return null;
+        }
+        return categoryRepository.findById(categoryId)
+                .orElseThrow(() -> {
+                    log.warn("Категория с ID {} не найдена при обновлении события", categoryId);
+                    return new NotFoundException("Category with id=" + categoryId + " not found");
+                });
+    }
+
+    private Event findUserEventOrThrow(Long userId, Long eventId) {
+        return eventRepository.findByInitiatorIdAndId(userId, eventId)
+                .orElseThrow(() -> {
+                    log.warn("Событие с ID {} не найдено для пользователя {} при запросе/обновлении", eventId, userId);
+                    return new NotFoundException("Event with id=" + eventId + " for user=" + userId + " not found");
+                });
+    }
+
+    private LocalDateTime parseAndValidateEventDate(String eventDateString) {
+        LocalDateTime newDate = LocalDateTime.parse(eventDateString, FORMATTER);
+        if (newDate.isBefore(LocalDateTime.now().plusHours(MIN_HOURS_BEFORE_EVENT))) {
+            log.warn("Попытка установить дату события раньше чем через {} часа(ов): {}", MIN_HOURS_BEFORE_EVENT, newDate);
+            throw new ValidationException("Event date must be at least " + MIN_HOURS_BEFORE_EVENT + " hours in the future");
+        }
+        return newDate;
+    }
+
+    private void validateNewEventDateIfPresent(Long eventId, String eventDateString) {
+        if (eventDateString != null) {
+            LocalDateTime newDate = LocalDateTime.parse(eventDateString, FORMATTER);
+            if (newDate.isBefore(LocalDateTime.now().plusHours(MIN_HOURS_BEFORE_EVENT))) {
+                log.warn("Попытка установить дату события {} ранее чем через {} часа(ов): {}", eventId, MIN_HOURS_BEFORE_EVENT, newDate);
+                throw new ValidationException("Event date must be at least " + MIN_HOURS_BEFORE_EVENT + " hours in the future");
+            }
+            log.debug("Дата события {} будет обновлена на {}", eventId, newDate);
+        }
+    }
+
+    private void validateUpdatableState(Event event) {
+        if (!event.getState().equals(State.PENDING) && !event.getState().equals(State.CANCELED)) {
+            log.warn("Невозможно обновить событие {}: текущий статус — {}", event.getId(), event.getState());
+            throw new ConflictException("Only PENDING or CANCELED events can be updated");
+        }
+    }
+
+    private void processEventStateAction(Event event, StateActionUser action) {
+        if (action == null) {
+            return;
+        }
+
+        if (action == StateActionUser.SEND_TO_REVIEW) {
+            event.setState(State.PENDING);
+            log.info("Событие {} отправлено на модерацию", event.getId());
+        } else if (action == StateActionUser.CANCEL_REVIEW) {
+            event.setState(State.CANCELED);
+            log.info("Событие {} отменено инициатором", event.getId());
+        }
     }
 }
