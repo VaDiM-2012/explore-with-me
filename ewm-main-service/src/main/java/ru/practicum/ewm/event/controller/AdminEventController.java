@@ -1,14 +1,13 @@
 package ru.practicum.ewm.event.controller;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.ewm.event.dto.EventFullDto;
 import ru.practicum.ewm.event.dto.UpdateEventAdminRequest;
 import ru.practicum.ewm.event.service.AdminEventService;
 import ru.practicum.ewm.exception.ValidationException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import jakarta.validation.Valid;
 
@@ -18,9 +17,8 @@ import java.util.List;
 @RestController
 @RequestMapping("/admin/events")
 @RequiredArgsConstructor
+@Slf4j
 public class AdminEventController {
-
-    private static final Logger log = LoggerFactory.getLogger(AdminEventController.class);
 
     private final AdminEventService adminEventService;
 

@@ -1,14 +1,13 @@
 package ru.practicum.ewm.user.controller;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.ewm.user.dto.NewUserRequest;
 import ru.practicum.ewm.user.dto.UserDto;
 import ru.practicum.ewm.user.service.UserService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import jakarta.validation.Valid;
 import java.util.List;
@@ -17,10 +16,10 @@ import java.util.List;
 @RequestMapping("/admin/users")
 @RequiredArgsConstructor
 @Validated
+@Slf4j
 public class AdminUserController {
 
     private final UserService userService;
-    private static final Logger log = LoggerFactory.getLogger(AdminUserController.class);
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)

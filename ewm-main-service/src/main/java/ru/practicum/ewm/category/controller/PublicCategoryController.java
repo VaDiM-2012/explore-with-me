@@ -1,6 +1,7 @@
 package ru.practicum.ewm.category.controller;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.ewm.category.dto.CategoryDto;
 import ru.practicum.ewm.category.service.CategoryService;
@@ -9,16 +10,14 @@ import jakarta.servlet.http.HttpServletRequest;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @RestController
 @RequestMapping("/categories")
 @RequiredArgsConstructor
+@Slf4j
 public class PublicCategoryController {
 
     private static final String APP_NAME = "ewm-main-service";
-    private static final Logger log = LoggerFactory.getLogger(PublicCategoryController.class);
 
     private final CategoryService service;
     private final StatsClient statsClient;

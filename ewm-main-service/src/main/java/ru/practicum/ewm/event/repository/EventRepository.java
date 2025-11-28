@@ -34,9 +34,6 @@ public interface EventRepository extends JpaRepository<Event, Long> {
                                       Pageable pageable);
 
     // === Public API: поиск опубликованных событий ===
-    // Примечание: для решения ошибки "lower(bytea) does not exist" требуется
-    // изменить тип столбцов annotation, title, description в БД на TEXT/VARCHAR.
-    // Запрос в JPQL ниже написан корректно для строковых полей.
     @Query("""
             SELECT e FROM Event e
             WHERE e.state = 'PUBLISHED'

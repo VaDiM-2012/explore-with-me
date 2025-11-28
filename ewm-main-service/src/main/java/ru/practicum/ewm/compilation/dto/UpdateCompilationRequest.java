@@ -1,4 +1,3 @@
-// UpdateCompilationRequest.java
 package ru.practicum.ewm.compilation.dto;
 
 import jakarta.validation.constraints.Size;

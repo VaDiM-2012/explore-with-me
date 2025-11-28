@@ -1,8 +1,7 @@
 package ru.practicum.ewm.request.service;
 
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.ewm.event.model.Event;
@@ -27,9 +26,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+@Slf4j
 public class RequestServiceImpl implements RequestService {
-
-    private static final Logger log = LoggerFactory.getLogger(RequestServiceImpl.class);
 
     private final RequestRepository requestRepository;
     private final UserRepository userRepository;

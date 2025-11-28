@@ -8,7 +8,6 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
 
     boolean existsByName(String name);
 
-    // Проверка на наличие событий (предполагаем, что Entity Event существует в пакете event.model.Event)
     @Query("SELECT COUNT(e) > 0 FROM Event e WHERE e.category.id = :catId")
     boolean hasEvents(Long catId);
 }

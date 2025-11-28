@@ -1,4 +1,3 @@
-// CompilationDto.java
 package ru.practicum.ewm.compilation.dto;
 
 import lombok.AllArgsConstructor;

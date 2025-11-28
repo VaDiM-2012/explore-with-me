@@ -1,8 +1,7 @@
 package ru.practicum.ewm.user.service;
 
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -22,11 +21,10 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+@Slf4j
 public class UserServiceImpl implements UserService {
 
-    private static final Logger log = LoggerFactory.getLogger(UserServiceImpl.class);
-
-    private final UserRepository userRepository;
+     private final UserRepository userRepository;
     private final UserMapper userMapper;
 
     @Override
@@ -58,7 +56,6 @@ public class UserServiceImpl implements UserService {
             users = userRepository.findAllById(ids);
             log.info("Найдено {} пользователей по списку id", users.size());
 
-            // Применяем пагинацию вручную
             users = users.stream()
                     .skip(from)
                     .limit(size)

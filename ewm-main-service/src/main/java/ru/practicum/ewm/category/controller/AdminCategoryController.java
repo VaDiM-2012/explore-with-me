@@ -1,14 +1,13 @@
 package ru.practicum.ewm.category.controller;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.ewm.category.dto.CategoryDto;
 import ru.practicum.ewm.category.dto.NewCategoryDto;
 import ru.practicum.ewm.category.service.CategoryService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import jakarta.validation.Valid;
 
@@ -16,10 +15,10 @@ import jakarta.validation.Valid;
 @RequestMapping("/admin/categories")
 @RequiredArgsConstructor
 @Validated
+@Slf4j
 public class AdminCategoryController {
 
     private final CategoryService service;
-    private static final Logger log = LoggerFactory.getLogger(AdminCategoryController.class);
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)

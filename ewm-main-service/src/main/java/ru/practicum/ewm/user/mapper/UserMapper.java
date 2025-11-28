@@ -24,7 +24,6 @@ public class UserMapper {
                 .build();
     }
 
-    // Новый метод: User → UserShortDto
     public UserShortDto toUserShortDto(User user) {
         if (user == null) {
             return null;

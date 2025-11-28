@@ -2,8 +2,7 @@ package ru.practicum.ewm.event.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.ewm.event.dto.EventFullDto;
@@ -17,14 +16,13 @@ import java.util.List;
 @RestController
 @RequestMapping("/events")
 @RequiredArgsConstructor
+@Slf4j
 public class PublicEventController {
 
     private static final String APP_NAME = "ewm-main-service";
 
     private final PublicEventService publicEventService;
     private final StatsClient statsClient;
-
-    private static final Logger log = LoggerFactory.getLogger(PublicEventController.class);
 
     @GetMapping
     public List<EventShortDto> getEvents(

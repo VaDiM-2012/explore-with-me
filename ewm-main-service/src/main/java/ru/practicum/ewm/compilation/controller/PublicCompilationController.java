@@ -1,6 +1,7 @@
 package ru.practicum.ewm.compilation.controller;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.ewm.compilation.dto.CompilationDto;
 import ru.practicum.ewm.compilation.service.CompilationService;
@@ -8,16 +9,13 @@ import ru.practicum.stats.client.StatsClient;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 @RestController
 @RequestMapping("/compilations")
 @RequiredArgsConstructor
+@Slf4j
 public class PublicCompilationController {
 
     private static final String APP_NAME = "ewm-main-service";
-    private static final Logger log = LoggerFactory.getLogger(PublicCompilationController.class);
 
     private final CompilationService service;
     private final StatsClient statsClient;
