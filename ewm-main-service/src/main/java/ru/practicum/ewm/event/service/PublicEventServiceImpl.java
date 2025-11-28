@@ -57,12 +57,6 @@ public class PublicEventServiceImpl implements PublicEventService {
         log.info("Начало публичного поиска событий с параметрами: text='{}', categories={}, paid={}, rangeStart={}, rangeEnd={}, onlyAvailable={}, sort={}, from={}, size={}, ip={}",
                 text, categories, paid, rangeStart, rangeEnd, onlyAvailable, sort, from, size, ip);
 
-        try {
-            statsClient.hit("ewm-main-service", "/events", ip, LocalDateTime.now());
-            log.debug("Отправлена статистика о просмотре списка событий с IP: {}", ip);
-        } catch (Exception e) {
-            log.warn("Не удалось отправить данные в сервис статистики: {}", e.getMessage());
-        }
 
         // --- ИСПРАВЛЕНИЕ ЛОГИКИ ДАТ ---
         LocalDateTime start = rangeStart != null ? rangeStart : LocalDateTime.now();
@@ -138,13 +132,6 @@ public class PublicEventServiceImpl implements PublicEventService {
     @Override
     public EventFullDto getEventById(Long id, String ip) {
         log.info("Начало получения полной информации о публичном событии: id={}, ip={}", id, ip);
-
-        try {
-            statsClient.hit("ewm-main-service", "/events/" + id, ip, LocalDateTime.now());
-            log.debug("Отправлена статистика о просмотре события: event_id={}, ip={}", id, ip);
-        } catch (Exception e) {
-            log.warn("Не удалось отправить данные в сервис статистики: {}", e.getMessage());
-        }
 
         Event event = eventRepository.findByIdAndState(id, State.PUBLISHED)
                 .orElseThrow(() -> {
