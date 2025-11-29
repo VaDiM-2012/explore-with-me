@@ -38,6 +38,7 @@ public class CompilationServiceImpl implements CompilationService {
                 dto.isPinned(), dto.getTitle(), dto.getEvents() != null ? dto.getEvents().size() : 0);
 
         Set<Event> events = new HashSet<>();
+
         if (dto.getEvents() != null && !dto.getEvents().isEmpty()) {
             events = new HashSet<>(eventRepository.findAllById(dto.getEvents()));
             log.info("Найдено {} событий для добавления в подборку", events.size());
@@ -45,9 +46,9 @@ public class CompilationServiceImpl implements CompilationService {
 
         Compilation compilation = compilationMapper.toEntity(dto);
         compilation.setEvents(events);
-
         Compilation saved = compilationRepository.save(compilation);
         log.info("Подборка успешно создана с ID: {}", saved.getId());
+
         return compilationMapper.toDto(saved);
     }
 
@@ -55,10 +56,8 @@ public class CompilationServiceImpl implements CompilationService {
     @Transactional
     public void deleteCompilation(Long compId) {
         log.info("Начало удаления подборки с ID: {}", compId);
-        if (!compilationRepository.existsById(compId)) {
-            log.warn("Подборка с ID {} не найдена при попытке удаления", compId);
-            throw new NotFoundException("Compilation with id=" + compId + " not found");
-        }
+        getCompilationOrThrow(compId);
+
         compilationRepository.deleteById(compId);
         log.info("Подборка с ID {} успешно удалена", compId);
     }
@@ -67,12 +66,7 @@ public class CompilationServiceImpl implements CompilationService {
     @Transactional
     public CompilationDto updateCompilation(Long compId, UpdateCompilationRequest request) {
         log.info("Начало обновления подборки с ID: {}", compId);
-        Compilation compilation = compilationRepository.findById(compId)
-                .orElseThrow(() -> {
-                    log.warn("Подборка с ID {} не найдена при обновлении", compId);
-                    return new NotFoundException("Compilation with id=" + compId + " not found");
-                });
-
+        Compilation compilation = getCompilationOrThrow(compId);
         compilationMapper.updateFromRequest(request, compilation);
 
         if (request.getEvents() != null) {
@@ -92,6 +86,7 @@ public class CompilationServiceImpl implements CompilationService {
         PageRequest page = PageRequest.of(from / size, size, Sort.by("id").ascending());
 
         List<Compilation> compilations;
+
         if (pinned != null) {
             compilations = compilationRepository.findAllByPinned(pinned, page);
         } else {
@@ -102,18 +97,24 @@ public class CompilationServiceImpl implements CompilationService {
                 .map(compilationMapper::toDto)
                 .collect(Collectors.toList());
         log.info("Найдено {} подборок", result.size());
+
         return result;
     }
 
     @Override
     public CompilationDto getCompilationById(Long compId) {
         log.info("Получен запрос на получение подборки по ID: {}", compId);
-        Compilation compilation = compilationRepository.findById(compId)
+        Compilation compilation = getCompilationOrThrow(compId);
+        log.info("Подборка найдена: ID={}, title='{}'", compilation.getId(), compilation.getTitle());
+
+        return compilationMapper.toDto(compilation);
+    }
+
+    private Compilation getCompilationOrThrow(Long compId) {
+        return compilationRepository.findById(compId)
                 .orElseThrow(() -> {
                     log.warn("Подборка с ID {} не найдена", compId);
                     return new NotFoundException("Compilation with id=" + compId + " not found");
                 });
-        log.info("Подборка найдена: ID={}, title='{}'", compilation.getId(), compilation.getTitle());
-        return compilationMapper.toDto(compilation);
     }
 }

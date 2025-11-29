@@ -10,6 +10,8 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class EventRequestStatusUpdateRequest {
+
     private List<Long> requestIds;
+
     private String status; // "CONFIRMED" or "REJECTED"
 }

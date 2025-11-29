@@ -30,12 +30,15 @@ public class CategoryServiceImpl implements CategoryService {
     @Transactional
     public CategoryDto addCategory(NewCategoryDto dto) {
         log.info("Начало добавления новой категории: {}", dto.getName());
+
         if (repository.existsByName(dto.getName())) {
             log.warn("Категория с именем '{}' уже существует", dto.getName());
             throw new ConflictException("Категория с именем '" + dto.getName() + "' уже существует");
         }
+
         Category saved = repository.save(mapper.toCategory(dto));
         log.info("Категория успешно добавлена с ID: {}", saved.getId());
+
         return mapper.toDto(saved);
     }
 
@@ -43,13 +46,9 @@ public class CategoryServiceImpl implements CategoryService {
     @Transactional
     public CategoryDto updateCategory(Long catId, CategoryDto dto) {
         log.info("Начало обновления категории с ID: {}", catId);
-        Category category = repository.findById(catId)
-                .orElseThrow(() -> {
-                    log.warn("Категория с ID {} не найдена при попытке обновления", catId);
-                    return new NotFoundException("Категория с id=" + catId + " не найдена");
-                });
-
+        Category category = getCategoryOrThrow(catId);
         String newName = dto.getName();
+
         if (newName != null && !newName.equals(category.getName()) && repository.existsByName(newName)) {
             log.warn("Категория с именем '{}' уже существует при обновлении", newName);
             throw new ConflictException("Категория с именем '" + newName + "' уже существует");
@@ -58,6 +57,7 @@ public class CategoryServiceImpl implements CategoryService {
         mapper.updateFromDto(dto, category);
         Category updated = repository.save(category);
         log.info("Категория с ID {} успешно обновлена", updated.getId());
+
         return mapper.toDto(updated);
     }
 
@@ -65,11 +65,7 @@ public class CategoryServiceImpl implements CategoryService {
     @Transactional
     public void deleteCategory(Long catId) {
         log.info("Начало удаления категории с ID: {}", catId);
-        Category category = repository.findById(catId)
-                .orElseThrow(() -> {
-                    log.warn("Категория с ID {} не найдена при попытке удаления", catId);
-                    return new NotFoundException("Категория с id=" + catId + " не найдена");
-                });
+        Category category = getCategoryOrThrow(catId);
 
         if (repository.hasEvents(catId)) {
             log.warn("Попытка удалить категорию с ID {}, к которой привязаны события", catId);
@@ -89,6 +85,7 @@ public class CategoryServiceImpl implements CategoryService {
         List<CategoryDto> categories = repository.findAll(pageRequest).stream()
                 .map(mapper::toDto)
                 .collect(Collectors.toList());
+
         log.info("Возвращено {} категорий", categories.size());
         return categories;
     }
@@ -96,12 +93,17 @@ public class CategoryServiceImpl implements CategoryService {
     @Override
     public CategoryDto getCategoryById(Long catId) {
         log.info("Получен запрос на получение категории по ID: {}", catId);
-        Category category = repository.findById(catId)
+        Category category = getCategoryOrThrow(catId);
+
+        log.info("Категория найдена: ID={}, name='{}'", category.getId(), category.getName());
+        return mapper.toDto(category);
+    }
+
+    private Category getCategoryOrThrow(Long catId) {
+        return repository.findById(catId)
                 .orElseThrow(() -> {
                     log.warn("Категория с ID {} не найдена", catId);
                     return new NotFoundException("Категория с id=" + catId + " не найдена");
                 });
-        log.info("Категория найдена: ID={}, name='{}'", category.getId(), category.getName());
-        return mapper.toDto(category);
     }
 }

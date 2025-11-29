@@ -160,7 +160,7 @@ public class RequestServiceImpl implements RequestService {
     public List<ParticipationRequestDto> getEventRequests(Long userId, Long eventId) {
         log.info("Получение запросов на участие в событии={} от инициатора={}", eventId, userId);
 
-        Event event = eventRepository.findByInitiatorIdAndId(userId, eventId)
+        eventRepository.findByInitiatorIdAndId(userId, eventId)
                 .orElseThrow(() -> {
                     log.warn("Событие с id={} для пользователя={} не найдено", eventId, userId);
                     return new NotFoundException("Event with id=" + eventId + " for user=" + userId + " not found");

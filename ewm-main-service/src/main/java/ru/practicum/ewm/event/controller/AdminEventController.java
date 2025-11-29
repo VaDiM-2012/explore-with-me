@@ -6,7 +6,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.ewm.event.dto.EventFullDto;
 import ru.practicum.ewm.event.dto.UpdateEventAdminRequest;
-import ru.practicum.ewm.event.service.AdminEventService;
+import ru.practicum.ewm.event.service.EventService;
 import ru.practicum.ewm.exception.ValidationException;
 
 import jakarta.validation.Valid;
@@ -20,41 +20,31 @@ import java.util.List;
 @Slf4j
 public class AdminEventController {
 
-    private final AdminEventService adminEventService;
+    private final EventService eventService;
 
     @GetMapping
     public List<EventFullDto> searchEvents(
             @RequestParam(required = false) List<Long> users,
             @RequestParam(required = false) List<String> states,
             @RequestParam(required = false) List<Long> categories,
-            @RequestParam(required = false)
-            @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime rangeStart,
-            @RequestParam(required = false)
-            @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime rangeEnd,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime rangeStart,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime rangeEnd,
             @RequestParam(defaultValue = "0") Integer from,
             @RequestParam(defaultValue = "10") Integer size) {
 
-        log.info("Получен запрос GET /admin/events — поиск событий с параметрами: " +
-                "users={}, states={}, categories={}, rangeStart={}, rangeEnd={}, from={}, size={}",
-                users, states, categories, rangeStart, rangeEnd, from, size);
+        log.info("ADMIN: поиск событий с фильтрами");
 
         if (rangeStart != null && rangeEnd != null && !rangeEnd.isAfter(rangeStart)) {
-            log.warn("Некорректный диапазон дат: rangeEnd={} не после rangeStart={}", rangeEnd, rangeStart);
-            throw new ValidationException("Invalid date range: rangeEnd must be after rangeStart");
+            throw new ValidationException("rangeEnd must be after rangeStart");
         }
 
-        List<EventFullDto> events = adminEventService.searchEvents(users, states, categories, rangeStart, rangeEnd, from, size);
-        log.info("Найдено {} событий по заданным критериям", events.size());
-        return events;
+        return eventService.searchEventsForAdmin(users, states, categories, rangeStart, rangeEnd, from, size);
     }
-
 
     @PatchMapping("/{eventId}")
     public EventFullDto updateEventByAdmin(@PathVariable Long eventId,
                                            @Valid @RequestBody UpdateEventAdminRequest request) {
-        log.info("Получен запрос PATCH /admin/events/{} — обновление события администратором: {}", eventId, request);
-        EventFullDto updatedEvent = adminEventService.updateEventByAdmin(eventId, request);
-        log.info("Событие с ID {} успешно обновлено администратором", updatedEvent.getId());
-        return updatedEvent;
+        log.info("ADMIN: обновление события {}", eventId);
+        return eventService.updateEventByAdmin(eventId, request);
     }
 }

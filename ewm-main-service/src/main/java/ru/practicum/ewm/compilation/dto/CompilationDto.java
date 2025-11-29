@@ -13,8 +13,12 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CompilationDto {
+
     private Long id;
+
     private String title;
+
     private boolean pinned;
+
     private Set<EventShortDto> events;
 }

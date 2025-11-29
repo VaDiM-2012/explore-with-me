@@ -7,7 +7,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.ewm.event.dto.EventFullDto;
 import ru.practicum.ewm.event.dto.EventShortDto;
-import ru.practicum.ewm.event.service.PublicEventService;
+import ru.practicum.ewm.event.service.EventService;
 import ru.practicum.ewm.exception.ValidationException;
 import ru.practicum.stats.client.StatsClient;
 import java.time.LocalDateTime;
@@ -21,7 +21,7 @@ public class PublicEventController {
 
     private static final String APP_NAME = "ewm-main-service";
 
-    private final PublicEventService publicEventService;
+    private final EventService eventService;
     private final StatsClient statsClient;
 
     @GetMapping
@@ -37,44 +37,36 @@ public class PublicEventController {
             @RequestParam(defaultValue = "10") Integer size,
             HttpServletRequest request) {
 
-        log.info("Получен публичный запрос GET /events — поиск событий с параметрами: " +
-                "text='{}', categories={}, paid={}, rangeStart={}, rangeEnd={}, onlyAvailable={}, sort={}, from={}, size={}",
-                text, categories, paid, rangeStart, rangeEnd, onlyAvailable, sort, from, size);
+        log.info("Публичный поиск событий");
 
         if (rangeStart != null && rangeEnd != null && !rangeEnd.isAfter(rangeStart)) {
-            log.warn("Некорректный диапазон дат: rangeEnd={} не после rangeStart={}", rangeEnd, rangeStart);
-            throw new ValidationException("Invalid date range: rangeEnd must be after rangeStart");
+            throw new ValidationException("rangeEnd must be after rangeStart");
         }
 
         String ip = request.getRemoteAddr();
+        String uri = request.getRequestURI();
 
-        try {
-            statsClient.hit(APP_NAME, request.getRequestURI(), ip, LocalDateTime.now());
-            log.info("Отправлена статистика о просмотре: URI='{}', IP='{}'", request.getRequestURI(), ip);
-        } catch (Exception e) {
-            log.warn("Не удалось отправить данные в сервис статистики: {}", e.getMessage());
-        }
+        hitStats(uri, ip);
 
-        List<EventShortDto> events = publicEventService.getEvents(text, categories, paid, rangeStart, rangeEnd, onlyAvailable, sort, from, size, ip);
-        log.info("Найдено {} событий по запросу", events.size());
-        return events;
+        return eventService.getPublishedEvents(text, categories, paid, rangeStart, rangeEnd,
+                onlyAvailable, sort, from, size, ip);
     }
 
     @GetMapping("/{id}")
     public EventFullDto getEventById(@PathVariable Long id, HttpServletRequest request) {
-        log.info("Получен публичный запрос GET /events/{} — получение полной информации о событии", id);
+        log.info("Публичный запрос события {}", id);
 
         String ip = request.getRemoteAddr();
+        hitStats(request.getRequestURI(), ip);
 
+        return eventService.getPublishedEventById(id, ip);
+    }
+
+    private void hitStats(String uri, String ip) {
         try {
-            statsClient.hit(APP_NAME, request.getRequestURI(), ip, LocalDateTime.now());
-            log.info("Отправлена статистика о просмотре события: event_id={}, IP='{}'", id, ip);
+            statsClient.hit(APP_NAME, uri, ip, LocalDateTime.now());
         } catch (Exception e) {
-            log.warn("Не удалось отправить данные в сервис статистики: {}", e.getMessage());
+            log.warn("Не удалось отправить hit в stats-service: {}", e.getMessage());
         }
-
-        EventFullDto event = publicEventService.getEventById(id, ip);
-        log.info("Событие найдено: ID={}, title='{}', initiatorId={}", event.getId(), event.getTitle(), event.getInitiator().getId());
-        return event;
     }
 }
