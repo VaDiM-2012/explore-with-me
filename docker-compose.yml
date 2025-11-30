@@ -16,8 +16,8 @@ services:
 
   stats-server:
     build:
-      context: .                  # теперь контекст — корень репозитория
-      dockerfile: Dockerfile      # используем Dockerfile из корня
+      context: ./ewm-stats-service/stats-server  # ← Изменено: указываем на подпапку с src и pom.xml
+      dockerfile: Dockerfile
     container_name: stats-server
     ports:
       - "9090:9090"
@@ -30,9 +30,42 @@ services:
       SPRING_DATASOURCE_PASSWORD: root
       SERVER_PORT: 9090
 
-#  ewm-service:
-#    ports:
-#      - "8080:8080"
-#
-#  ewm-db:
-#    image: postgres:16.1
+  ewm-db:
+    image: postgres:16.1
+    container_name: ewm-db
+    ports:
+      - "6542:5432"
+    environment:
+      POSTGRES_DB: ewm-db
+      POSTGRES_USER: ewm
+      POSTGRES_PASSWORD: ewm
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "ewm", "-d", "ewm-db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  ewm-main-service:
+    build:
+      context: ./ewm-main-service
+      dockerfile: Dockerfile
+    container_name: ewm-main-service
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://ewm-db:5432/ewm-db
+      SPRING_DATASOURCE_USERNAME: ewm
+      SPRING_DATASOURCE_PASSWORD: ewm
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      STATS_SERVER_URL: http://stats-server:9090
+      SERVER_PORT: 8080
+#      TZ: Europe/Moscow
+    depends_on:
+      - ewm-db
+      - stats-server
+    volumes:
+      - ./ewm-main-service.log:/app/logs/ewm-main-service.log
+
+networks:
+  default:
+    driver: bridge
